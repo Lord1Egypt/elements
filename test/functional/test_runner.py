@@ -112,6 +112,9 @@ BASE_SCRIPTS = [
     'rpc_getnewblockhex.py',
     'wallet_elements_regression_1172.py --legacy-wallet',
     'wallet_elements_regression_1259.py --legacy-wallet',
+    'wallet_elements_21million.py',
+    'wallet_elements_dust_relay.py',
+    'feature_trim_headers.py',
     # Longest test should go first, to favor running tests in parallel
     'wallet_hd.py --legacy-wallet',
     'wallet_hd.py --descriptors',
@@ -185,6 +188,9 @@ BASE_SCRIPTS = [
     'wallet_avoidreuse.py --descriptors',
     'mempool_reorg.py',
     'mempool_persist.py',
+    # ELEMENTS: discounted Confidential Transactions
+    'feature_discount_ct.py',
+    'feature_discount_ct_ordering.py',
     'wallet_multiwallet.py --legacy-wallet',
     'wallet_multiwallet.py --descriptors',
     'wallet_multiwallet.py --usecli',
@@ -237,8 +243,8 @@ BASE_SCRIPTS = [
     'p2p_invalid_locator.py',
     'p2p_invalid_block.py',
     'feature_elements_taproot_activation.py',
-    # ELEMENTS: needs to be fixed
-    #'p2p_invalid_messages.py',
+    'feature_elements_simplicity_activation.py',
+    'p2p_invalid_messages.py',
     'p2p_invalid_tx.py',
     'feature_assumevalid.py',
     'example_test.py',
@@ -349,6 +355,7 @@ BASE_SCRIPTS = [
     'feature_coinstatsindex.py --legacy-wallet',
     'feature_coinstatsindex.py --descriptors',
     'wallet_orphanedreward.py',
+    'wallet_send_zero_fee.py',
     'wallet_timelock.py',
     'p2p_node_network_limited.py',
     'p2p_permissions.py',

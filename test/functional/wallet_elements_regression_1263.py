@@ -19,11 +19,13 @@ class RegressionTest(BitcoinTestFramework):
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
+        self.skip_if_no_bdb()
 
     def run_test(self):
         self.log.info("Start in Bitcoin regtest mode")
         self.nodes[0].createwallet("pegin")
         rpc = self.nodes[0].get_wallet_rpc("pegin")
+        self.generatetoaddress(self.nodes[0], 1, rpc.getnewaddress())
 
         self.log.info("Call getpeginaddress")
         assert_raises_rpc_error(-32603, "No valid fedpegscripts. Not running in Elements mode, check your 'chain' param.", rpc.getpeginaddress)

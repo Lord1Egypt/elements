@@ -102,7 +102,7 @@ private:
     const unsigned int entryHeight; //!< Chain height when entering the mempool
     const bool spendsCoinbase;      //!< keep track of transactions that spend a coinbase
     const int64_t sigOpCost;        //!< Total sigop cost
-    int64_t feeDelta{0};            //!< Used for determining the priority of the transaction for mining in a block
+    CAmount m_modified_fee;         //!< Used for determining the priority of the transaction for mining in a block
     LockPoints lockPoints;     //!< Track the height and time at which tx was final
 
     // Information about descendants of this transaction that are in the
@@ -117,6 +117,7 @@ private:
     uint64_t nSizeWithAncestors;
     CAmount nModFeesWithAncestors;
     int64_t nSigOpCostWithAncestors;
+    uint64_t discountSizeWithAncestors; // ELEMENTS
 
 public:
     CTxMemPoolEntry(const CTransactionRef& tx, CAmount fee,
@@ -129,21 +130,21 @@ public:
     CTransactionRef GetSharedTx() const { return this->tx; }
     const CAmount& GetFee() const { return nFee; }
     size_t GetTxSize() const;
+    size_t GetDiscountTxSize() const;
     size_t GetTxWeight() const { return nTxWeight; }
     std::chrono::seconds GetTime() const { return std::chrono::seconds{nTime}; }
     unsigned int GetHeight() const { return entryHeight; }
     int64_t GetSigOpCost() const { return sigOpCost; }
-    int64_t GetModifiedFee() const { return nFee + feeDelta; }
+    CAmount GetModifiedFee() const { return m_modified_fee; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints& GetLockPoints() const { return lockPoints; }
 
     // Adjusts the descendant state.
     void UpdateDescendantState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
     // Adjusts the ancestor state
-    void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int64_t modifySigOps);
-    // Updates the fee delta used for mining priority score, and the
-    // modified fees with descendants.
-    void UpdateFeeDelta(int64_t feeDelta);
+    void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int64_t modifySigOps, int64_t discountSize);
+    // Updates the modified fees with descendants/ancestors.
+    void UpdateModifiedFee(CAmount fee_diff);
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints& lp);
 
@@ -155,6 +156,7 @@ public:
 
     uint64_t GetCountWithAncestors() const { return nCountWithAncestors; }
     uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
+    uint64_t GetDiscountSizeWithAncestors() const { return discountSizeWithAncestors; }
     CAmount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
     int64_t GetSigOpCostWithAncestors() const { return nSigOpCostWithAncestors; }
 
@@ -318,11 +320,56 @@ public:
     }
 };
 
+/** \class CompareTxMemPoolEntryByConfidentialFee
+ *
+ *  Sort an entry by min(score/discountvsize of entry's tx, score/discountvsize with all ancestors).
+ */
+class CompareTxMemPoolEntryByConfidentialFee
+{
+public:
+    template <typename T>
+    bool operator()(const T& a, const T& b) const
+    {
+        double a_mod_fee, a_size, b_mod_fee, b_size;
+
+        GetModFeeAndSize(a, a_mod_fee, a_size);
+        GetModFeeAndSize(b, b_mod_fee, b_size);
+
+        // Avoid division by rewriting (a/b > c/d) as (a*d > c*b).
+        double f1 = a_mod_fee * b_size;
+        double f2 = a_size * b_mod_fee;
+
+        if (f1 == f2) {
+            return a.GetTx().GetHash() < b.GetTx().GetHash();
+        }
+        return f1 > f2;
+    }
+
+    // Return the fee/size we're using for sorting this entry.
+    template <typename T>
+    void GetModFeeAndSize(const T& a, double& mod_fee, double& size) const
+    {
+        // Compare feerate with ancestors to feerate of the transaction, and
+        // return the fee/size for the min.
+        double f1 = (double)a.GetModifiedFee() * a.GetDiscountSizeWithAncestors();
+        double f2 = (double)a.GetModFeesWithAncestors() * a.GetDiscountTxSize();
+
+        if (f1 > f2) {
+            mod_fee = a.GetModFeesWithAncestors();
+            size = a.GetDiscountSizeWithAncestors();
+        } else {
+            mod_fee = a.GetModifiedFee();
+            size = a.GetDiscountTxSize();
+        }
+    }
+};
+
 // Multi_index tag names
 struct descendant_score {};
 struct entry_time {};
 struct ancestor_score {};
 struct index_by_wtxid {};
+struct confidential_score {}; // ELEMENTS
 
 class CBlockPolicyEstimator;
 
@@ -345,6 +392,9 @@ struct TxMempoolInfo
 
     /** The fee delta. */
     int64_t nFeeDelta;
+
+    /** ELEMENTS: Discounted CT size. */
+    size_t discountvsize;
 };
 
 /** Reason why a transaction was removed from the mempool,
@@ -380,6 +430,7 @@ enum class MemPoolRemovalReason {
  * - descendant feerate [we use max(feerate of tx, feerate of tx with all descendants)]
  * - time in mempool
  * - ancestor feerate [we use min(feerate of tx, feerate of tx with all unconfirmed ancestors)]
+ * - ancestor feerate by discount vsize // ELEMENTS: "confidential_score"
  *
  * Note: the term "descendant" refers to in-mempool transactions that depend on
  * this one, while "ancestor" refers to in-mempool transactions that a given
@@ -489,6 +540,12 @@ public:
                 boost::multi_index::tag<ancestor_score>,
                 boost::multi_index::identity<CTxMemPoolEntry>,
                 CompareTxMemPoolEntryByAncestorFee
+            >,
+            // ELEMENTS: sorted by confidential first fee rate with ancestors
+            boost::multi_index::ordered_non_unique<
+                boost::multi_index::tag<confidential_score>,
+                boost::multi_index::identity<CTxMemPoolEntry>,
+                CompareTxMemPoolEntryByConfidentialFee
             >
         >
     > indexed_transaction_set;
