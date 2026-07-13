@@ -641,7 +641,6 @@ static RPCHelpMan getblockheader()
                             {RPCResult::Type::NUM_TIME, "mediantime", "The median block time expressed in " + UNIX_EPOCH_TIME},
                             {RPCResult::Type::NUM, "nonce", /*optional=*/true, "The nonce"},
                             {RPCResult::Type::STR_HEX, "bits", /*optional=*/true, "The bits"},
-                            {RPCResult::Type::STR_HEX, "target", /*optional=*/true, "The difficulty target"},
                             {RPCResult::Type::NUM, "difficulty", /*optional=*/true, "The difficulty"},
                             {RPCResult::Type::STR_HEX, "chainwork", /*optional=*/true, "Expected number of hashes required to produce the current chain"},
                             {RPCResult::Type::NUM, "nTx", "The number of transactions in the block"},
@@ -843,7 +842,6 @@ static RPCHelpMan getblock()
                     {RPCResult::Type::NUM_TIME, "mediantime", "The median block time expressed in " + UNIX_EPOCH_TIME},
                     {RPCResult::Type::NUM, "nonce", /*optional=*/true, "The nonce"},
                     {RPCResult::Type::STR_HEX, "bits", /*optional=*/true, "The bits"},
-                    {RPCResult::Type::STR_HEX, "target", /*optional=*/true, "The difficulty target"},
                     {RPCResult::Type::NUM, "difficulty", /*optional=*/true, "The difficulty"},
                     {RPCResult::Type::STR_HEX, "chainwork", /*optional=*/true, "Expected number of hashes required to produce the chain up to this block"},
                     {RPCResult::Type::NUM, "nTx", "The number of transactions in the block"},
@@ -867,7 +865,7 @@ static RPCHelpMan getblock()
                                 {RPCResult::Type::ELISION, "", ""}
                             }},
                         }},
-                        {RPCResult::Type::OBJ, "proposed", "Proposed parameters. Uninforced. Must be published in full",
+                        {RPCResult::Type::OBJ, "proposed", "Proposed parameters. Unenforced. Must be published in full",
                         {
                             {RPCResult::Type::ELISION, "", "same entries as \"current\""}
                         }},
@@ -1454,14 +1452,14 @@ RPCHelpMan getblockchaininfo()
                 {RPCResult::Type::NUM, "blocks", "the height of the most-work fully-validated chain. The genesis block has height 0"},
                 {RPCResult::Type::NUM, "headers", "the current number of headers we have validated"},
                 {RPCResult::Type::STR, "bestblockhash", "the hash of the currently best block"},
-                /* ELEMENTS: not present {RPCResult::Type::NUM, "difficulty", "the current difficulty"}, */
-                {RPCResult::Type::STR_HEX, "bits", "nBits: compact representation of the block difficulty target"},
-                {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
+                {RPCResult::Type::STR_HEX, "bits", /*optional=*/true, "nBits: compact representation of the block difficulty target"},
+                {RPCResult::Type::STR_HEX, "target", /*optional=*/true, "The difficulty target"},
+                {RPCResult::Type::NUM, "difficulty", /*optional=*/true, "the current difficulty"},
                 {RPCResult::Type::NUM_TIME, "time", "The block time expressed in " + UNIX_EPOCH_TIME},
                 {RPCResult::Type::NUM_TIME, "mediantime", "The median block time expressed in " + UNIX_EPOCH_TIME},
                 {RPCResult::Type::NUM, "verificationprogress", "estimate of verification progress [0..1]"},
                 {RPCResult::Type::BOOL, "initialblockdownload", "(debug information) estimate of whether this node is in Initial Block Download mode"},
-                /* ELEMENTS: not present {RPCResult::Type::STR_HEX, "chainwork", "total amount of work in active chain, in hexadecimal"}, */
+                {RPCResult::Type::STR_HEX, "chainwork", /*optional=*/true, "total amount of work in active chain, in hexadecimal"},
                 {RPCResult::Type::NUM, "size_on_disk", "the estimated size of the block and undo files on disk"},
                 {RPCResult::Type::BOOL, "pruned", "if the blocks are subject to pruning"},
                 {RPCResult::Type::BOOL, "trim_headers", "whether header trimming is enabled (-trim-headers)"},
@@ -2477,7 +2475,7 @@ static RPCHelpMan scantxoutset()
                         {RPCResult::Type::STR_HEX, "scriptPubKey", "The output script"},
                         {RPCResult::Type::STR, "desc", "A specialized descriptor for the matched output script"},
                         {RPCResult::Type::STR_AMOUNT, "amount", "The total amount in " + CURRENCY_UNIT + " of the unspent output"},
-                        {RPCResult::Type::STR_HEX, "asset", "The asset ID"},
+                        {RPCResult::Type::STR_HEX, "asset", /*optional=*/true,  "The asset ID"},
                         {RPCResult::Type::BOOL, "coinbase", "Whether this is a coinbase output"},
                         {RPCResult::Type::NUM, "height", "Height of the unspent transaction output"},
                         {RPCResult::Type::STR_HEX, "blockhash", "Blockhash of the unspent transaction output"},
@@ -2526,7 +2524,7 @@ static RPCHelpMan scantxoutset()
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Scan already in progress, use action \"abort\" or \"status\"");
         }
 
-        if (request.params.size() < 2) {
+        if (request.params[1].isNull()) {
             throw JSONRPCError(RPC_MISC_ERROR, "scanobjects argument is required for the start action");
         }
 
@@ -2900,7 +2898,7 @@ static RPCHelpMan getdescriptoractivity()
                         {RPCResult::Type::STR_HEX, "blockhash", /*optional=*/true, "The blockhash this spend appears in (omitted if unconfirmed)"},
                         {RPCResult::Type::NUM, "height", /*optional=*/true, "Height of the spend (omitted if unconfirmed)"},
                         {RPCResult::Type::STR_HEX, "spend_txid", "The txid of the spending transaction"},
-                        {RPCResult::Type::NUM, "spend_vout", "The vout of the spend"},
+                        {RPCResult::Type::NUM, "spend_vin", "The vin of the spend"},
                         {RPCResult::Type::STR_HEX, "prevout_txid", "The txid of the prevout"},
                         {RPCResult::Type::NUM, "prevout_vout", "The vout of the prevout"},
                         {RPCResult::Type::OBJ, "prevout_spk", "", ScriptPubKeyDoc()},
@@ -3679,10 +3677,10 @@ static RPCHelpMan getsidechaininfo()
                     RPCResult::Type::OBJ, "", "",
                     {
                         {RPCResult::Type::STR_HEX, "fedpegscript", "The fedpegscript from genesis block"},
-                        {RPCResult::Type::ARR, "current_fedpegscripts", "The currently-enforced fedpegscripts in hex. Peg-ins for any entries on this list are honored by consensus and policy. Newest first. Two total entries are possible",
-                            {{RPCResult::Type::STR_HEX, "", "active fedpegscript"}}},
                         {RPCResult::Type::ARR, "current_fedpeg_programs", "The currently-enforced fedpegscript scriptPubKeys in hex. Prior to a transition this may be P2SH scriptpubkey, otherwise it will be a native segwit script. Results are paired in-order with current_fedpegscripts",
                             {{RPCResult::Type::STR_HEX, "", "active fedpegscript scriptPubKeys"}}},
+                        {RPCResult::Type::ARR, "current_fedpegscripts", "The currently-enforced fedpegscripts in hex. Peg-ins for any entries on this list are honored by consensus and policy. Newest first. Two total entries are possible",
+                            {{RPCResult::Type::STR_HEX, "", "active fedpegscript"}}},
                         {RPCResult::Type::STR_HEX, "pegged_asset", "Pegged asset type"},
                         {RPCResult::Type::STR, "min_peg_diff", "The minimum difficulty parent chain header target. Peg-in headers that have less work will be rejected as an anti-Dos measure"},
                         {RPCResult::Type::STR_HEX, "parent_blockhash", "The parent genesis blockhash as source of pegged-in funds"},
