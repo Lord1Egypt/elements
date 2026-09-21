@@ -636,6 +636,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-capturemessages", "Capture all P2P messages to disk", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-mocktime=<n>", "Replace actual time with " + UNIX_EPOCH_TIME + " (default: 0)", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-maxsigcachesize=<n>", strprintf("Limit sum of signature cache and script execution cache sizes to <n> MiB (default: %u)", DEFAULT_VALIDATION_CACHE_BYTES >> 20), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-rangeproofcache", strprintf("Enable the range proof validation cache (default: %u). Use -norangeproofcache to disable.", 1), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-maxtipage=<n>",
                    strprintf("Maximum tip age in seconds to consider node in initial block download (default: %u)",
                              Ticks<std::chrono::seconds>(DEFAULT_MAX_TIP_AGE)),
@@ -1102,6 +1103,13 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     peer_connect_timeout = args.GetIntArg("-peertimeout", DEFAULT_PEER_CONNECT_TIMEOUT);
     if (peer_connect_timeout <= 0) {
         return InitError(Untranslated("peertimeout must be a positive integer."));
+    }
+
+    if (chainparams.GetConsensus().has_parent_chain && !chainparams.GetConsensus().ParentChainHasPow()) {
+        LogPrintf("This chain is configured with a signed-blocks parent chain. "
+                    "Peg-ins referencing a parent block that has activated dynamic "
+                    "federations will be rejected: such headers cannot be "
+                    "authenticated. See doc/ for details.\n");
     }
 
     // Sanity check argument for min fee for including tx in block

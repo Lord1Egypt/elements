@@ -26,7 +26,7 @@ message("")
 message("Configuring secp256k1 subtree...")
 set(SECP256K1_ENABLE_MODULE_GENERATOR ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_RANGEPROOF ON CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_SURJECTION ON CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_SURJECTIONPROOF ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_WHITELIST ON CACHE BOOL "" FORCE)
 set(SECP256K1_DISABLE_SHARED ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_ECDH ON CACHE BOOL "" FORCE)
@@ -78,6 +78,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 enable_language(C)
 add_library(elementssimplicity STATIC EXCLUDE_FROM_ALL
   simplicity/bitstream.c
+  simplicity/cmr.c
   simplicity/dag.c
   simplicity/deserialize.c
   simplicity/eval.c
@@ -114,7 +115,7 @@ target_link_libraries(elementssimplicity
 )
 
 # macOS Apple Clang is stricter than Linux GCC on this vendored code
-if(APPLE)
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
   target_compile_options(elementssimplicity PRIVATE
     -Wno-error=conditional-uninitialized
     -Wno-error=implicit-fallthrough
